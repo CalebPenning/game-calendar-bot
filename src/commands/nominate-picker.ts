@@ -1,15 +1,9 @@
-import {
-	SlashCommandBuilder,
-	ChatInputCommandInteraction,
-	EmbedBuilder,
-	PermissionFlagsBits,
-	MessageFlags,
-} from 'discord.js'
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, MessageFlags } from 'discord.js'
 import { GameClubDatabase } from '../database'
 
 export const data = new SlashCommandBuilder()
 	.setName('nominate-picker')
-	.setDescription('Nominate a member to pick the next game (Admin only)')
+	.setDescription('Nominate a member to pick the next game')
 	.addUserOption((option) => option.setName('user').setDescription('The user to nominate').setRequired(true))
 	.addStringOption((option) =>
 		option
@@ -17,22 +11,9 @@ export const data = new SlashCommandBuilder()
 			.setDescription('Month to nominate for (YYYY-MM format, defaults to current month)')
 			.setRequired(false),
 	)
-	.setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
 
 export async function execute(interaction: ChatInputCommandInteraction, db: GameClubDatabase) {
 	try {
-		// Check if user has admin permissions
-		if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
-			const embed = new EmbedBuilder()
-				.setColor(0xff6b6b)
-				.setTitle('❌ Insufficient Permissions')
-				.setDescription('You need the "Manage Messages" permission to use this command.')
-				.setTimestamp()
-
-			await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral })
-			return
-		}
-
 		const targetUser = interaction.options.getUser('user', true)
 		const monthInput = interaction.options.getString('month')
 
