@@ -10,7 +10,8 @@
     "deploy": "npm run build && node dist/deploy-commands.js",
     "setup": "tsx src/setup.ts",
     "test-db": "tsx src/test-db.ts",
-    "format": "prettier --write ./src/**/*.ts"
+    "format": "prettier --write ./src/**/*.ts",
+    "railway": "npm run deploy && npm start"
   },
   "keywords": [
     "discord",
