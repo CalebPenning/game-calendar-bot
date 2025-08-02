@@ -10,7 +10,12 @@ config()
 
 // Create a new client instance
 const client = new Client({
-	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.MessageContent,
+		GatewayIntentBits.GuildMembers,
+	],
 })
 
 // Initialize database
@@ -93,6 +98,12 @@ function setupScheduledTasks() {
 		await sendWeeklyReminders()
 	})
 
+	// Run daily at 12:00 PM to check for auto-nominations (when 7 days left in month)
+	cron.schedule('0 12 * * *', async () => {
+		console.log('🤖 Auto-nomination check triggered')
+		await checkAutoNomination()
+	})
+
 	// Run on the 25th of every month to remind about next month
 	cron.schedule('0 10 25 * *', async () => {
 		console.log('🔔 Next month reminder triggered')
@@ -105,15 +116,11 @@ function setupScheduledTasks() {
 async function sendMonthlyNotifications() {
 	try {
 		const guilds = client.guilds.cache
-		const currentMonth = new Date().toISOString().slice(0, 7)
 		const currentGame = db.getCurrentMonthGame()
 
-		for (const [guildId, guild] of guilds) {
+		for (const [_, guild] of guilds) {
 			// Find a general channel to send notifications
-			const channel = guild.channels.cache.find(
-				(ch) =>
-					ch.isTextBased() && (ch.name.includes('general') || ch.name.includes('game') || ch.name.includes('club')),
-			)
+			const channel = guild.channels.cache.find((ch) => ch.isTextBased() && ch.name === 'gamin')
 
 			if (!channel || !channel.isTextBased()) continue
 
@@ -145,11 +152,8 @@ async function sendWeeklyReminders() {
 		const currentGame = db.getCurrentMonthGame()
 		const nomination = db.getActiveNominationForMonth(currentMonth)
 
-		for (const [guildId, guild] of guilds) {
-			const channel = guild.channels.cache.find(
-				(ch) =>
-					ch.isTextBased() && (ch.name.includes('general') || ch.name.includes('game') || ch.name.includes('club')),
-			)
+		for (const [_, guild] of guilds) {
+			const channel = guild.channels.cache.find((ch) => ch.isTextBased() && ch.name === 'gamin')
 
 			if (!channel || !channel.isTextBased()) continue
 
@@ -203,6 +207,92 @@ async function sendNextMonthReminder() {
 		}
 	} catch (error) {
 		console.error('Error sending next month reminders:', error)
+	}
+}
+
+async function checkAutoNomination() {
+	try {
+		const guilds = client.guilds.cache
+		const now = new Date()
+		const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
+
+		// Only auto-nominate when exactly 7 days left in the month
+		if (daysLeft !== 7) return
+
+		const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1)
+		const nextMonthStr = nextMonth.toISOString().slice(0, 7)
+		const nextMonthName = nextMonth.toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'long',
+		})
+
+		// Check if someone is already nominated for next month
+		const existingNomination = db.getActiveNominationForMonth(nextMonthStr)
+		if (existingNomination) {
+			console.log(`🤖 Next month already has nomination: ${existingNomination.nominated_username}`)
+			return
+		}
+
+		// Check if game already selected for next month
+		const existingGame = db.getGameByMonth(nextMonthStr)
+		if (existingGame) {
+			console.log(`🤖 Next month already has game selected: ${existingGame.game_name}`)
+			return
+		}
+
+		for (const [_, guild] of guilds) {
+			// Get all guild members (not just those in our rotation database)
+			const members = await guild.members.fetch()
+
+			// Exclude bots, the specific user ID, and last 2 pickers
+			const recentPickers = db
+				.getAllGames()
+				.slice(0, 2)
+				.map((game) => game.picker_id)
+			const excludedUserIds = ['1085028125336948898', ...recentPickers]
+
+			const eligibleMembers = members.filter((member) => !member.user.bot && !excludedUserIds.includes(member.user.id))
+
+			if (eligibleMembers.size === 0) {
+				console.log('🤖 No eligible members found for auto-nomination')
+				continue
+			}
+
+			// Randomly select a member
+			const membersArray = Array.from(eligibleMembers.values())
+			const randomMember = membersArray[Math.floor(Math.random() * membersArray.length)]
+			const username = randomMember.displayName || randomMember.user.username
+
+			// Add to member rotation if not already there
+			if (!db.getMemberByUserId(randomMember.user.id)) {
+				db.addMember(randomMember.user.id, username)
+			}
+
+			// Create nomination
+			db.addNomination(randomMember.user.id, username, nextMonthStr)
+
+			// Send notification to channel
+			const channel = guild.channels.cache.find((ch) => ch.isTextBased() && ch.name === 'gamin')
+
+			if (channel && channel.isTextBased()) {
+				await channel.send({
+					content: `🤖 **AUTO-NOMINATION!** 🤖\n\nWith 7 days left in the month, I've randomly selected <@${randomMember.user.id}> to pick the game for **${nextMonthName}**!\n\n<@${randomMember.user.id}>, use \`/select-game\` to choose your game! 🎮`,
+				})
+
+				// Try to send DM to nominated user
+				try {
+					await randomMember.user.send({
+						content: `🤖 **You've Been Auto-Nominated!** 🤖\n\nYou've been randomly selected to pick the game for **${nextMonthName}** in the Game Book Club!\n\nUse the \`/select-game\` command in the server to choose your game. Take your time and pick something you think everyone will enjoy! 🎮`,
+					})
+				} catch (error) {
+					console.log('Could not send DM to auto-nominated user:', error)
+				}
+
+				console.log(`🤖 Auto-nominated ${username} for ${nextMonthName}`)
+			}
+		}
+	} catch (error) {
+		console.error('Error in auto-nomination:', error)
 	}
 }
 
