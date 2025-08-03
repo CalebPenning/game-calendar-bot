@@ -8,6 +8,12 @@ import fs from 'fs'
 // Load environment variables
 config()
 
+// Debug environment variables
+console.log('🔍 Environment check:')
+console.log('NODE_ENV:', process.env.NODE_ENV)
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL)
+console.log('DATABASE_PRIVATE_URL exists:', !!process.env.DATABASE_PRIVATE_URL)
+
 // Create a new client instance
 const client = new Client({
 	intents: [

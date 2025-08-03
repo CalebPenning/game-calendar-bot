@@ -181,11 +181,11 @@ export class GameClubDatabase {
 
 	async getCurrentlyEligibleMembers(): Promise<MemberRotation[]> {
 		try {
-			const recentPickers = (await this.sql<Partial<GameEntry>[]>`
+			const recentPickers = await this.sql<Partial<GameEntry>[]>`
 				SELECT picker_id FROM games
 				ORDER BY month DESC
 				LIMIT 2
-			`)
+			`
 
 			const excludeIds = recentPickers.map((p) => p.picker_id).filter((id): id is string => !!id)
 
