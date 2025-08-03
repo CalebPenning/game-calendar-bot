@@ -36,9 +36,7 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 			.setDescription(`Showing the last ${games.length} game${games.length !== 1 ? 's' : ''}:`)
 			.setTimestamp()
 
-		// Add fields for each game
 		games.forEach((game, index) => {
-			// Parse YYYY-MM safely
 			const [year, month] = game.month.split('-')
 			const monthName = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', {
 				year: 'numeric',

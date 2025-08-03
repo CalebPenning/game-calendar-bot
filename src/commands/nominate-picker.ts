@@ -17,10 +17,8 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 		const targetUser = interaction.options.getUser('user', true)
 		const monthInput = interaction.options.getString('month')
 
-		// Determine target month
 		let targetMonth: string
 		if (monthInput) {
-			// Validate month format
 			if (!/^\d{4}-\d{2}$/.test(monthInput)) {
 				const embed = new EmbedBuilder()
 					.setColor(0xff6b6b)
@@ -75,16 +73,13 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 			return
 		}
 
-		// Add user to member rotation if not already there
 		const username = targetUser.displayName || targetUser.username
 		if (!(await db.getMemberByUserId(targetUser.id))) {
 			await db.addMember(targetUser.id, username)
 		}
 
-		// Create nomination
 		const nomination = await db.addNomination(targetUser.id, username, targetMonth)
 
-		// Parse YYYY-MM safely
 		const [year, month] = targetMonth.split('-')
 		const monthName = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', {
 			year: 'numeric',
@@ -104,7 +99,6 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 
 		await interaction.reply({ embeds: [embed] })
 
-		// Send a DM to the nominated user
 		try {
 			const dmEmbed = new EmbedBuilder()
 				.setColor(0x95e1d3)

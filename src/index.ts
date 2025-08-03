@@ -5,16 +5,8 @@ import * as cron from 'node-cron'
 import path from 'path'
 import fs from 'fs'
 
-// Load environment variables
 config()
 
-// Debug environment variables
-console.log('🔍 Environment check:')
-console.log('NODE_ENV:', process.env.NODE_ENV)
-console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL)
-console.log('DATABASE_PRIVATE_URL exists:', !!process.env.DATABASE_PRIVATE_URL)
-
-// Create a new client instance
 const client = new Client({
 	intents: [
 		GatewayIntentBits.Guilds,
@@ -24,10 +16,8 @@ const client = new Client({
 	],
 })
 
-// Initialize database
 const db = new GameClubDatabase()
 
-// Create a collection to store commands
 interface Command {
 	data: any
 	execute: (interaction: ChatInputCommandInteraction, db: GameClubDatabase) => Promise<void>
@@ -35,7 +25,6 @@ interface Command {
 
 const commands = new Collection<string, Command>()
 
-// Load commands
 const commandsPath = path.join(__dirname, 'commands')
 const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js') || file.endsWith('.ts'))
 
@@ -51,16 +40,13 @@ for (const file of commandFiles) {
 	}
 }
 
-// Bot ready event
 client.once(Events.ClientReady, (readyClient) => {
 	console.log(`🤖 Ready! Logged in as ${readyClient.user.tag}`)
 	console.log(`📊 Loaded ${commands.size} commands`)
 
-	// Set bot status
 	client.user?.setActivity('Game Book Club | /current-game', { type: 0 })
 })
 
-// Handle slash command interactions
 client.on(Events.InteractionCreate, async (interaction) => {
 	if (!interaction.isChatInputCommand()) return
 
@@ -299,7 +285,6 @@ async function checkAutoNomination() {
 	}
 }
 
-// Graceful shutdown
 process.on('SIGINT', () => {
 	console.log('🛑 Shutting down gracefully...')
 	db.close()
@@ -314,12 +299,10 @@ process.on('SIGTERM', () => {
 	process.exit(0)
 })
 
-// Setup scheduled tasks after client is ready
 client.once(Events.ClientReady, () => {
 	setupScheduledTasks()
 })
 
-// Login to Discord
 const token = process.env.DISCORD_TOKEN
 if (!token) {
 	console.error('❌ DISCORD_TOKEN is not set in environment variables!')

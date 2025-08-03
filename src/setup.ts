@@ -15,7 +15,6 @@ console.log('🎮 Discord Game Club Bot - Setup Helper\n')
 const envPath = path.join(process.cwd(), '.env')
 const envExamplePath = path.join(process.cwd(), '.env.example')
 
-// Check if .env file exists
 if (!fs.existsSync(envPath)) {
 	console.log('❌ .env file not found!')
 
@@ -57,7 +56,6 @@ GUILD_ID=your_guild_id_here`
 	process.exit(1)
 }
 
-// Check .env file content
 console.log('✅ Found .env file')
 
 try {
