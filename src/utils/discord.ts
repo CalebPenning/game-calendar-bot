@@ -1,4 +1,5 @@
 import { Guild, GuildMember, GuildTextBasedChannel } from 'discord.js'
+import { randomInt } from 'crypto'
 import { CONFIG } from '../config'
 
 export function findGameChannel(guild: Guild): GuildTextBasedChannel | undefined {
@@ -15,9 +16,14 @@ export function getEligibleMembersForAutoNomination(
 	return Array.from(members.values()).filter((member) => !member.user.bot && !excludedUserIds.includes(member.user.id))
 }
 
+/**
+ * Select a random member from an array using cryptographically secure randomness
+ * Uses Node.js crypto.randomInt() to ensure fairness and prevent gaming
+ */
 export function selectRandomMember(members: GuildMember[]): GuildMember | null {
 	if (members.length === 0) return null
-	return members[Math.floor(Math.random() * members.length)]
+	const randomIndex = randomInt(0, members.length)
+	return members[randomIndex]
 }
 
 export function getDisplayName(member: GuildMember): string {
