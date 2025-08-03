@@ -1,19 +1,20 @@
 import postgres from 'postgres'
 import { GameEntry, MemberRotation, GameNomination } from './types'
+import { ENVIRONMENT } from './config'
 
 export class GameClubDatabase {
 	private sql: postgres.Sql
 
 	constructor() {
 		try {
-			const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PRIVATE_URL
+			const connectionString = ENVIRONMENT.DATABASE_URL || ENVIRONMENT.DATABASE_PRIVATE_URL
 
 			if (!connectionString) {
 				throw new Error('DATABASE_URL or DATABASE_PRIVATE_URL environment variable is required')
 			}
 
 			this.sql = postgres(connectionString, {
-				ssl: process.env.NODE_ENV === 'production' ? 'require' : false,
+				ssl: ENVIRONMENT.NODE_ENV === 'production' ? 'require' : false,
 			})
 
 			console.log('📦 PostgreSQL database connected')
