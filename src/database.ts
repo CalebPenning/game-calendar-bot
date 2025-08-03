@@ -72,14 +72,14 @@ export class GameClubDatabase {
 
 	async addGame(gameData: Omit<GameEntry, 'id' | 'created_at'>): Promise<GameEntry> {
 		try {
-			const [result] = await this.sql`
+			const [result] = await this.sql<GameEntry[]>`
 				INSERT INTO games (game_name, picker_id, picker_name, month, selected_at, game_description, game_image_url)
 				VALUES (${gameData.game_name}, ${gameData.picker_id}, ${gameData.picker_name}, 
 						${gameData.month}, ${gameData.selected_at}, ${gameData.game_description || null}, 
 						${gameData.game_image_url || null})
 				RETURNING *
 			`
-			return result as GameEntry
+			return result
 		} catch (error) {
 			console.error('❌ Failed to add game:', error)
 			throw error
@@ -88,8 +88,8 @@ export class GameClubDatabase {
 
 	async getGameById(id: number): Promise<GameEntry | null> {
 		try {
-			const [result] = await this.sql`SELECT * FROM games WHERE id = ${id}`
-			return (result as GameEntry) || null
+			const [result] = await this.sql<GameEntry[]>`SELECT * FROM games WHERE id = ${id}`
+			return result || null
 		} catch (error) {
 			console.error('❌ Failed to get game by ID:', error)
 			return null
@@ -98,8 +98,8 @@ export class GameClubDatabase {
 
 	async getGameByMonth(month: string): Promise<GameEntry | null> {
 		try {
-			const [result] = await this.sql`SELECT * FROM games WHERE month = ${month}`
-			return (result as GameEntry) || null
+			const [result] = await this.sql<GameEntry[]>`SELECT * FROM games WHERE month = ${month}`
+			return result || null
 		} catch (error) {
 			console.error('❌ Failed to get game by month:', error)
 			return null
@@ -123,13 +123,13 @@ export class GameClubDatabase {
 
 	async addMember(userId: string, username: string): Promise<MemberRotation> {
 		try {
-			const [result] = await this.sql`
+			const [result] = await this.sql<MemberRotation[]>`
 				INSERT INTO member_rotation (user_id, username)
 				VALUES (${userId}, ${username})
 				ON CONFLICT (user_id) DO UPDATE SET username = ${username}
 				RETURNING *
 			`
-			return result as MemberRotation
+			return result
 		} catch (error) {
 			console.error('❌ Failed to add member:', error)
 			throw error
@@ -138,8 +138,8 @@ export class GameClubDatabase {
 
 	async getMemberByUserId(userId: string): Promise<MemberRotation | null> {
 		try {
-			const [result] = await this.sql`SELECT * FROM member_rotation WHERE user_id = ${userId}`
-			return (result as MemberRotation) || null
+			const [result] = await this.sql<MemberRotation[]>`SELECT * FROM member_rotation WHERE user_id = ${userId}`
+			return result || null
 		} catch (error) {
 			console.error('❌ Failed to get member by user ID:', error)
 			return null
@@ -179,15 +179,15 @@ export class GameClubDatabase {
 		}
 	}
 
-	async getEligibleMembersExcludingRecent(): Promise<MemberRotation[]> {
+	async getCurrentlyEligibleMembers(): Promise<MemberRotation[]> {
 		try {
-			const recentPickers = await this.sql`
+			const recentPickers = (await this.sql<Partial<GameEntry>[]>`
 				SELECT picker_id FROM games
 				ORDER BY month DESC
 				LIMIT 2
-			`
+			`)
 
-			const excludeIds = recentPickers.map((p) => p.picker_id as string)
+			const excludeIds = recentPickers.map((p) => p.picker_id).filter((id): id is string => !!id)
 
 			if (excludeIds.length === 0) {
 				return this.getEligibleMembers()
@@ -195,7 +195,7 @@ export class GameClubDatabase {
 
 			const results = await this.sql<MemberRotation[]>`
 				SELECT * FROM member_rotation 
-				WHERE is_eligible = true AND user_id != ALL(${excludeIds})
+				WHERE is_eligible = true AND user_id NOT IN ${this.sql(excludeIds)}
 			`
 
 			return results
@@ -213,13 +213,13 @@ export class GameClubDatabase {
 				WHERE target_month = ${targetMonth}
 			`
 
-			const [result] = await this.sql`
+			const [result] = await this.sql<GameNomination[]>`
 				INSERT INTO game_nominations (nominated_user_id, nominated_username, target_month)
 				VALUES (${userId}, ${username}, ${targetMonth})
 				RETURNING *
 			`
 
-			return result as GameNomination
+			return result
 		} catch (error) {
 			console.error('❌ Failed to add nomination:', error)
 			throw error
@@ -228,8 +228,8 @@ export class GameClubDatabase {
 
 	async getNominationById(id: number): Promise<GameNomination | null> {
 		try {
-			const [result] = await this.sql`SELECT * FROM game_nominations WHERE id = ${id}`
-			return (result as GameNomination) || null
+			const [result] = await this.sql<GameNomination[]>`SELECT * FROM game_nominations WHERE id = ${id}`
+			return result || null
 		} catch (error) {
 			console.error('❌ Failed to get nomination by ID:', error)
 			return null
@@ -238,11 +238,11 @@ export class GameClubDatabase {
 
 	async getActiveNominationForMonth(month: string): Promise<GameNomination | null> {
 		try {
-			const [result] = await this.sql`
+			const [result] = await this.sql<GameNomination[]>`
 				SELECT * FROM game_nominations 
 				WHERE target_month = ${month} AND is_active = true
 			`
-			return (result as GameNomination) || null
+			return result || null
 		} catch (error) {
 			console.error('❌ Failed to get active nomination for month:', error)
 			return null

@@ -64,7 +64,7 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 		}
 
 		// Add some helpful info
-		const eligibleMembers = await db.getEligibleMembersExcludingRecent()
+		const eligibleMembers = await db.getCurrentlyEligibleMembers()
 		if (eligibleMembers.length > 0) {
 			embed.addFields({
 				name: '👥 Currently Eligible for Nomination',

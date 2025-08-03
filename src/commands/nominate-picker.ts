@@ -52,7 +52,7 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 		}
 
 		// Check if user is eligible (not in last 2 pickers)
-		const eligibleMembers = await db.getEligibleMembersExcludingRecent()
+		const eligibleMembers = await db.getCurrentlyEligibleMembers()
 		const isEligible = eligibleMembers.some((member) => member.user_id === targetUser.id)
 
 		if (!isEligible && eligibleMembers.length > 0) {

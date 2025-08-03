@@ -49,7 +49,7 @@ async function testDatabase() {
 
 		console.log('6️⃣ Testing member rotation...')
 		await db.updateMemberAfterPick('user1', currentMonth)
-		const eligibleMembers = await db.getEligibleMembersExcludingRecent()
+		const eligibleMembers = await db.getCurrentlyEligibleMembers()
 		console.log(`✅ Eligible members (excluding recent): ${eligibleMembers.map((m) => m.username).join(', ')}`)
 
 		await db.close()
