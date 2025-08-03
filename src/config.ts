@@ -1,0 +1,35 @@
+export const CONFIG = {
+	CHANNELS: {
+		GAME_DISCUSSION: 'gamin',
+	},
+	SCHEDULING: {
+		MONTHLY_NOTIFICATIONS: '0 9 1 * *',
+		WEEKLY_REMINDERS: '0 10 * * 0',
+		AUTO_NOMINATION_CHECK: '0 12 * * *',
+		NEXT_MONTH_REMINDER: '0 10 25 * *',
+	},
+	AUTO_NOMINATION: {
+		DAYS_BEFORE_MONTH_END: 7,
+		EXCLUDED_USER_ID: '1085028125336948898',
+		RECENT_PICKER_EXCLUSION_COUNT: 2,
+	},
+	COLORS: {
+		PRIMARY: 0x4ecdc4,
+		SUCCESS: 0x45b7d1,
+		WARNING: 0xffd93d,
+		ERROR: 0xff6b6b,
+		INFO: 0x95e1d3,
+	},
+	TIMEOUTS: {
+		GAME_SELECTION: 60000, // 60 seconds
+	},
+} as const
+
+export const ENVIRONMENT = {
+	NODE_ENV: process.env.NODE_ENV || 'development',
+	DISCORD_TOKEN: process.env.DISCORD_TOKEN,
+	CLIENT_ID: process.env.CLIENT_ID,
+	DATABASE_URL: process.env.DATABASE_URL,
+	DATABASE_PRIVATE_URL: process.env.DATABASE_PRIVATE_URL,
+	GIANT_BOMB_API_KEY: process.env.GIANT_BOMB_API_KEY,
+} as const

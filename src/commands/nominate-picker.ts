@@ -1,5 +1,8 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, MessageFlags } from 'discord.js'
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, EmbedBuilder } from 'discord.js'
 import { GameClubDatabase } from '../database'
+import { getCurrentMonth, formatMonthYear } from '../utils/date'
+import { getDisplayName, sendDirectMessage } from '../utils/discord'
+import { createErrorEmbed, createWarningEmbed, createNominationEmbed } from '../utils/embeds'
 
 export const data = new SlashCommandBuilder()
 	.setName('nominate-picker')
@@ -20,21 +23,15 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 		let targetMonth: string
 		if (monthInput) {
 			if (!/^\d{4}-\d{2}$/.test(monthInput)) {
-				const embed = new EmbedBuilder()
-					.setColor(0xff6b6b)
-					.setTitle('❌ Invalid Month Format')
-					.setDescription('Please use YYYY-MM format (e.g., 2024-03)')
-					.setTimestamp()
-
+				const embed = createErrorEmbed('Invalid Month Format', 'Please use YYYY-MM format (e.g., 2024-03)')
 				await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral })
 				return
 			}
 			targetMonth = monthInput
 		} else {
-			targetMonth = new Date().toISOString().slice(0, 7) // Current month
+			targetMonth = getCurrentMonth()
 		}
 
-		// Check if game already exists for this month
 		const existingGame = await db.getGameByMonth(targetMonth)
 		if (existingGame) {
 			const embed = new EmbedBuilder()
@@ -49,7 +46,6 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 			return
 		}
 
-		// Check if user is eligible (not in last 2 pickers)
 		const eligibleMembers = await db.getCurrentlyEligibleMembers()
 		const isEligible = eligibleMembers.some((member) => member.user_id === targetUser.id)
 
@@ -73,29 +69,16 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 			return
 		}
 
-		const username = targetUser.displayName || targetUser.username
+		const member = interaction.guild?.members.cache.get(targetUser.id)
+		const username = member ? getDisplayName(member) : targetUser.displayName || targetUser.username
 		if (!(await db.getMemberByUserId(targetUser.id))) {
 			await db.addMember(targetUser.id, username)
 		}
 
-		const nomination = await db.addNomination(targetUser.id, username, targetMonth)
+		await db.addNomination(targetUser.id, username, targetMonth)
 
-		const [year, month] = targetMonth.split('-')
-		const monthName = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'long',
-		})
-
-		const embed = new EmbedBuilder()
-			.setColor(0x45b7d1)
-			.setTitle('🎯 Member Nominated!')
-			.setDescription(`<@${targetUser.id}> has been nominated to pick the game for **${monthName}**!`)
-			.addFields(
-				{ name: 'Nominated by', value: `<@${interaction.user.id}>`, inline: true },
-				{ name: 'Target Month', value: monthName, inline: true },
-			)
-			.setTimestamp()
-			.setFooter({ text: 'They can now use /select-game to choose!' })
+		const monthName = formatMonthYear(targetMonth)
+		const embed = createNominationEmbed(targetUser.id, monthName, interaction.user.id)
 
 		await interaction.reply({ embeds: [embed] })
 
@@ -114,7 +97,6 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 			await targetUser.send({ embeds: [dmEmbed] })
 		} catch (error) {
 			console.log('Could not send DM to nominated user:', error)
-			// Don't fail the command if DM fails
 		}
 	} catch (error) {
 		console.error('Error in nominate-picker command:', error)
