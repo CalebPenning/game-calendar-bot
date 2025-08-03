@@ -29,11 +29,11 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 		const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1).toISOString().slice(0, 7)
 
 		let targetMonth = currentMonth
-		let nomination = db.getActiveNominationForMonth(currentMonth)
+		let nomination = await db.getActiveNominationForMonth(currentMonth)
 
 		if (!nomination) {
 			targetMonth = nextMonth
-			nomination = db.getActiveNominationForMonth(nextMonth)
+			nomination = await db.getActiveNominationForMonth(nextMonth)
 		}
 
 		if (!nomination) {
@@ -60,7 +60,7 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 			return
 		}
 
-		const existingGame = db.getGameByMonth(targetMonth)
+		const existingGame = await db.getGameByMonth(targetMonth)
 		if (existingGame) {
 			const embed = new EmbedBuilder()
 				.setColor(0xff6b6b)
@@ -152,19 +152,21 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 				const selectedIndex = parseInt(selectInteraction.values[0])
 				const selectedGame = searchResults[selectedIndex]
 
-				const gameEntry = db.addGame({
+				const gameEntry = await db.addGame({
 					game_name: selectedGame.name,
 					picker_id: userId,
 					picker_name: username,
 					month: targetMonth,
 					selected_at: new Date().toISOString(),
+					game_description: selectedGame.deck,
+					game_image_url: selectedGame.image?.medium_url,
 				})
 
-				db.updateMemberAfterPick(userId, targetMonth)
-				db.deactivateNomination(nomination.id)
+				await db.updateMemberAfterPick(userId, targetMonth)
+				await db.deactivateNomination(nomination.id)
 
-				if (!db.getMemberByUserId(userId)) {
-					db.addMember(userId, username)
+				if (!(await db.getMemberByUserId(userId))) {
+					await db.addMember(userId, username)
 				}
 
 				const successEmbed = new EmbedBuilder()

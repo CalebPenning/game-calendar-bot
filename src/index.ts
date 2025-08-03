@@ -116,7 +116,7 @@ function setupScheduledTasks() {
 async function sendMonthlyNotifications() {
 	try {
 		const guilds = client.guilds.cache
-		const currentGame = db.getCurrentMonthGame()
+		const currentGame = await db.getCurrentMonthGame()
 
 		for (const [_, guild] of guilds) {
 			// Find a general channel to send notifications
@@ -149,8 +149,8 @@ async function sendWeeklyReminders() {
 		// Only send if we're in the last week of the month
 		if (daysLeft > 7) return
 
-		const currentGame = db.getCurrentMonthGame()
-		const nomination = db.getActiveNominationForMonth(currentMonth)
+		const currentGame = await db.getCurrentMonthGame()
+		const nomination = await db.getActiveNominationForMonth(currentMonth)
 
 		for (const [_, guild] of guilds) {
 			const channel = guild.channels.cache.find((ch) => ch.isTextBased() && ch.name === 'gamin')
@@ -183,8 +183,8 @@ async function sendNextMonthReminder() {
 			month: 'long',
 		})
 
-		const nextGame = db.getGameByMonth(nextMonthStr)
-		const nomination = db.getActiveNominationForMonth(nextMonthStr)
+		const nextGame = await db.getGameByMonth(nextMonthStr)
+		const nomination = await db.getActiveNominationForMonth(nextMonthStr)
 
 		for (const [_, guild] of guilds) {
 			const channel = guild.channels.cache.find((ch) => ch.isTextBased() && ch.name === 'gamin')
@@ -227,14 +227,14 @@ async function checkAutoNomination() {
 		})
 
 		// Check if someone is already nominated for next month
-		const existingNomination = db.getActiveNominationForMonth(nextMonthStr)
+		const existingNomination = await db.getActiveNominationForMonth(nextMonthStr)
 		if (existingNomination) {
 			console.log(`🤖 Next month already has nomination: ${existingNomination.nominated_username}`)
 			return
 		}
 
 		// Check if game already selected for next month
-		const existingGame = db.getGameByMonth(nextMonthStr)
+		const existingGame = await db.getGameByMonth(nextMonthStr)
 		if (existingGame) {
 			console.log(`🤖 Next month already has game selected: ${existingGame.game_name}`)
 			return
@@ -245,10 +245,7 @@ async function checkAutoNomination() {
 			const members = await guild.members.fetch()
 
 			// Exclude bots, the specific user ID, and last 2 pickers
-			const recentPickers = db
-				.getAllGames()
-				.slice(0, 2)
-				.map((game) => game.picker_id)
+			const recentPickers = (await db.getAllGames()).slice(0, 2).map((game) => game.picker_id)
 			const excludedUserIds = ['1085028125336948898', ...recentPickers]
 
 			const eligibleMembers = members.filter((member) => !member.user.bot && !excludedUserIds.includes(member.user.id))
@@ -264,12 +261,12 @@ async function checkAutoNomination() {
 			const username = randomMember.displayName || randomMember.user.username
 
 			// Add to member rotation if not already there
-			if (!db.getMemberByUserId(randomMember.user.id)) {
-				db.addMember(randomMember.user.id, username)
+			if (!(await db.getMemberByUserId(randomMember.user.id))) {
+				await db.addMember(randomMember.user.id, username)
 			}
 
 			// Create nomination
-			db.addNomination(randomMember.user.id, username, nextMonthStr)
+			await db.addNomination(randomMember.user.id, username, nextMonthStr)
 
 			// Send notification to channel
 			const channel = guild.channels.cache.find((ch) => ch.isTextBased() && ch.name === 'gamin')

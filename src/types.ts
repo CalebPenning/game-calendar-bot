@@ -3,9 +3,11 @@ export interface GameEntry {
 	game_name: string
 	picker_id: string
 	picker_name: string
-	month: string // YYYY-MM format
+	month: string
 	selected_at: string
 	created_at: string
+	game_description?: string
+	game_image_url?: string
 }
 
 export interface MemberRotation {

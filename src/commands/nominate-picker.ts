@@ -37,7 +37,7 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 		}
 
 		// Check if game already exists for this month
-		const existingGame = db.getGameByMonth(targetMonth)
+		const existingGame = await db.getGameByMonth(targetMonth)
 		if (existingGame) {
 			const embed = new EmbedBuilder()
 				.setColor(0xff6b6b)
@@ -52,11 +52,11 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 		}
 
 		// Check if user is eligible (not in last 2 pickers)
-		const eligibleMembers = db.getEligibleMembersExcludingRecent()
+		const eligibleMembers = await db.getCurrentlyEligibleMembers()
 		const isEligible = eligibleMembers.some((member) => member.user_id === targetUser.id)
 
 		if (!isEligible && eligibleMembers.length > 0) {
-			const recentGames = db.getAllGames().slice(0, 2)
+			const recentGames = (await db.getAllGames()).slice(0, 2)
 			const recentPickerNames = recentGames.map((game) => game.picker_name).join(', ')
 
 			const embed = new EmbedBuilder()
@@ -77,12 +77,12 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 
 		// Add user to member rotation if not already there
 		const username = targetUser.displayName || targetUser.username
-		if (!db.getMemberByUserId(targetUser.id)) {
-			db.addMember(targetUser.id, username)
+		if (!(await db.getMemberByUserId(targetUser.id))) {
+			await db.addMember(targetUser.id, username)
 		}
 
 		// Create nomination
-		const nomination = db.addNomination(targetUser.id, username, targetMonth)
+		const nomination = await db.addNomination(targetUser.id, username, targetMonth)
 
 		// Parse YYYY-MM safely
 		const [year, month] = targetMonth.split('-')

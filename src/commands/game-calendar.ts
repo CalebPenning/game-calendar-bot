@@ -33,10 +33,10 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 			})
 
 			// Check if game exists for this month
-			const game = db.getGameByMonth(targetMonth)
+			const game = await db.getGameByMonth(targetMonth)
 
 			// Check if there's an active nomination
-			const nomination = db.getActiveNominationForMonth(targetMonth)
+			const nomination = await db.getActiveNominationForMonth(targetMonth)
 
 			let status: string
 			let emoji: string
@@ -64,7 +64,7 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 		}
 
 		// Add some helpful info
-		const eligibleMembers = db.getEligibleMembersExcludingRecent()
+		const eligibleMembers = await db.getCurrentlyEligibleMembers()
 		if (eligibleMembers.length > 0) {
 			embed.addFields({
 				name: '👥 Currently Eligible for Nomination',
