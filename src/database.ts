@@ -1,17 +1,22 @@
-import Database from 'better-sqlite3'
+import postgres from 'postgres'
 import { GameEntry, MemberRotation, GameNomination } from './types'
 
 export class GameClubDatabase {
-	private db: Database.Database
+	private sql: postgres.Sql
 
-	constructor(dbPath: string = 'gameclub.db') {
+	constructor() {
 		try {
-			this.db = new Database(dbPath)
-			console.log(`📦 SQLite database connected: ${dbPath}`)
+			const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PRIVATE_URL
 
-			// Enable WAL mode for better performance
-			this.db.pragma('journal_mode = WAL')
+			if (!connectionString) {
+				throw new Error('DATABASE_URL or DATABASE_PRIVATE_URL environment variable is required')
+			}
 
+			this.sql = postgres(connectionString, {
+				ssl: process.env.NODE_ENV === 'production' ? 'require' : false,
+			})
+
+			console.log('📦 PostgreSQL database connected')
 			this.initializeTables()
 		} catch (error) {
 			console.error('❌ Failed to initialize database:', error)
@@ -19,45 +24,44 @@ export class GameClubDatabase {
 		}
 	}
 
-	private initializeTables() {
+	private async initializeTables() {
 		try {
-			// Games table
-			this.db.exec(`
-        CREATE TABLE IF NOT EXISTS games (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          game_name TEXT NOT NULL,
-          picker_id TEXT NOT NULL,
-          picker_name TEXT NOT NULL,
-          month TEXT NOT NULL UNIQUE,
-          selected_at TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      `)
+			await this.sql`
+				CREATE TABLE IF NOT EXISTS games (
+					id SERIAL PRIMARY KEY,
+					game_name TEXT NOT NULL,
+					picker_id TEXT NOT NULL,
+					picker_name TEXT NOT NULL,
+					month TEXT NOT NULL UNIQUE,
+					selected_at TIMESTAMPTZ NOT NULL,
+					created_at TIMESTAMPTZ DEFAULT NOW(),
+					game_description TEXT,
+					game_image_url TEXT
+				)
+			`
 
-			// Member rotation table
-			this.db.exec(`
-        CREATE TABLE IF NOT EXISTS member_rotation (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id TEXT NOT NULL UNIQUE,
-          username TEXT NOT NULL,
-          last_picked_month TEXT,
-          pick_count INTEGER DEFAULT 0,
-          is_eligible BOOLEAN DEFAULT 1,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      `)
+			await this.sql`
+				CREATE TABLE IF NOT EXISTS member_rotation (
+					id SERIAL PRIMARY KEY,
+					user_id TEXT NOT NULL UNIQUE,
+					username TEXT NOT NULL,
+					last_picked_month TEXT,
+					pick_count INTEGER DEFAULT 0,
+					is_eligible BOOLEAN DEFAULT true,
+					created_at TIMESTAMPTZ DEFAULT NOW()
+				)
+			`
 
-			// Game nominations table
-			this.db.exec(`
-        CREATE TABLE IF NOT EXISTS game_nominations (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nominated_user_id TEXT NOT NULL,
-          nominated_username TEXT NOT NULL,
-          target_month TEXT NOT NULL,
-          is_active BOOLEAN DEFAULT 1,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      `)
+			await this.sql`
+				CREATE TABLE IF NOT EXISTS game_nominations (
+					id SERIAL PRIMARY KEY,
+					nominated_user_id TEXT NOT NULL,
+					nominated_username TEXT NOT NULL,
+					target_month TEXT NOT NULL,
+					is_active BOOLEAN DEFAULT true,
+					created_at TIMESTAMPTZ DEFAULT NOW()
+				)
+			`
 
 			console.log('✅ Database tables initialized successfully')
 		} catch (error) {
@@ -66,220 +70,197 @@ export class GameClubDatabase {
 		}
 	}
 
-	// Game methods
-	addGame(gameData: Omit<GameEntry, 'id' | 'created_at'>): GameEntry {
+	async addGame(gameData: Omit<GameEntry, 'id' | 'created_at'>): Promise<GameEntry> {
 		try {
-			const stmt = this.db.prepare(`
-        INSERT INTO games (game_name, picker_id, picker_name, month, selected_at)
-        VALUES (?, ?, ?, ?, ?)
-      `)
-
-			const result = stmt.run(
-				gameData.game_name,
-				gameData.picker_id,
-				gameData.picker_name,
-				gameData.month,
-				gameData.selected_at,
-			)
-
-			return this.getGameById(result.lastInsertRowid as number)!
+			const [result] = await this.sql`
+				INSERT INTO games (game_name, picker_id, picker_name, month, selected_at, game_description, game_image_url)
+				VALUES (${gameData.game_name}, ${gameData.picker_id}, ${gameData.picker_name}, 
+						${gameData.month}, ${gameData.selected_at}, ${gameData.game_description || null}, 
+						${gameData.game_image_url || null})
+				RETURNING *
+			`
+			return result as GameEntry
 		} catch (error) {
 			console.error('❌ Failed to add game:', error)
 			throw error
 		}
 	}
 
-	getGameById(id: number): GameEntry | null {
+	async getGameById(id: number): Promise<GameEntry | null> {
 		try {
-			const stmt = this.db.prepare('SELECT * FROM games WHERE id = ?')
-			return stmt.get(id) as GameEntry | null
+			const [result] = await this.sql`SELECT * FROM games WHERE id = ${id}`
+			return (result as GameEntry) || null
 		} catch (error) {
 			console.error('❌ Failed to get game by ID:', error)
 			return null
 		}
 	}
 
-	getGameByMonth(month: string): GameEntry | null {
+	async getGameByMonth(month: string): Promise<GameEntry | null> {
 		try {
-			const stmt = this.db.prepare('SELECT * FROM games WHERE month = ?')
-			return stmt.get(month) as GameEntry | null
+			const [result] = await this.sql`SELECT * FROM games WHERE month = ${month}`
+			return (result as GameEntry) || null
 		} catch (error) {
 			console.error('❌ Failed to get game by month:', error)
 			return null
 		}
 	}
 
-	getCurrentMonthGame(): GameEntry | null {
-		const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
+	async getCurrentMonthGame(): Promise<GameEntry | null> {
+		const currentMonth = new Date().toISOString().slice(0, 7)
 		return this.getGameByMonth(currentMonth)
 	}
 
-	getAllGames(): GameEntry[] {
+	async getAllGames(): Promise<GameEntry[]> {
 		try {
-			const stmt = this.db.prepare('SELECT * FROM games ORDER BY month DESC')
-			return stmt.all() as GameEntry[]
+			const results = await this.sql<GameEntry[]>`SELECT * FROM games ORDER BY month DESC`
+			return results
 		} catch (error) {
 			console.error('❌ Failed to get all games:', error)
 			return []
 		}
 	}
 
-	// Member rotation methods
-	addMember(userId: string, username: string): MemberRotation {
+	async addMember(userId: string, username: string): Promise<MemberRotation> {
 		try {
-			const stmt = this.db.prepare(`
-        INSERT OR REPLACE INTO member_rotation (user_id, username)
-        VALUES (?, ?)
-      `)
-
-			stmt.run(userId, username)
-			return this.getMemberByUserId(userId)!
+			const [result] = await this.sql`
+				INSERT INTO member_rotation (user_id, username)
+				VALUES (${userId}, ${username})
+				ON CONFLICT (user_id) DO UPDATE SET username = ${username}
+				RETURNING *
+			`
+			return result as MemberRotation
 		} catch (error) {
 			console.error('❌ Failed to add member:', error)
 			throw error
 		}
 	}
 
-	getMemberByUserId(userId: string): MemberRotation | null {
+	async getMemberByUserId(userId: string): Promise<MemberRotation | null> {
 		try {
-			const stmt = this.db.prepare('SELECT * FROM member_rotation WHERE user_id = ?')
-			return stmt.get(userId) as MemberRotation | null
+			const [result] = await this.sql`SELECT * FROM member_rotation WHERE user_id = ${userId}`
+			return (result as MemberRotation) || null
 		} catch (error) {
 			console.error('❌ Failed to get member by user ID:', error)
 			return null
 		}
 	}
 
-	getAllMembers(): MemberRotation[] {
+	async getAllMembers(): Promise<MemberRotation[]> {
 		try {
-			const stmt = this.db.prepare('SELECT * FROM member_rotation ORDER BY username')
-			return stmt.all() as MemberRotation[]
+			const results = await this.sql<MemberRotation[]>`SELECT * FROM member_rotation ORDER BY username`
+			return results
 		} catch (error) {
 			console.error('❌ Failed to get all members:', error)
 			return []
 		}
 	}
 
-	getEligibleMembers(): MemberRotation[] {
+	async getEligibleMembers(): Promise<MemberRotation[]> {
 		try {
-			const stmt = this.db.prepare('SELECT * FROM member_rotation WHERE is_eligible = 1')
-			return stmt.all() as MemberRotation[]
+			const results = await this.sql<MemberRotation[]>`SELECT * FROM member_rotation WHERE is_eligible = true`
+			return results
 		} catch (error) {
 			console.error('❌ Failed to get eligible members:', error)
 			return []
 		}
 	}
 
-	updateMemberAfterPick(userId: string, month: string): void {
+	async updateMemberAfterPick(userId: string, month: string): Promise<void> {
 		try {
-			const stmt = this.db.prepare(`
-        UPDATE member_rotation
-        SET last_picked_month = ?, pick_count = pick_count + 1
-        WHERE user_id = ?
-      `)
-
-			stmt.run(month, userId)
+			await this.sql`
+				UPDATE member_rotation
+				SET last_picked_month = ${month}, pick_count = pick_count + 1
+				WHERE user_id = ${userId}
+			`
 		} catch (error) {
 			console.error('❌ Failed to update member after pick:', error)
 			throw error
 		}
 	}
 
-	// Get members excluding the last two pickers
-	getEligibleMembersExcludingRecent(): MemberRotation[] {
+	async getEligibleMembersExcludingRecent(): Promise<MemberRotation[]> {
 		try {
-			const recentPickers = this.db
-				.prepare(
-					`
-        SELECT picker_id FROM games
-        ORDER BY month DESC
-        LIMIT 2
-      `,
-				)
-				.all() as { picker_id: string }[]
+			const recentPickers = await this.sql`
+				SELECT picker_id FROM games
+				ORDER BY month DESC
+				LIMIT 2
+			`
 
-			const excludeIds = recentPickers.map((p) => p.picker_id)
+			const excludeIds = recentPickers.map((p) => p.picker_id as string)
 
 			if (excludeIds.length === 0) {
 				return this.getEligibleMembers()
 			}
 
-			const placeholders = excludeIds.map(() => '?').join(',')
-			const stmt = this.db.prepare(`
-        SELECT * FROM member_rotation 
-        WHERE is_eligible = 1 AND user_id NOT IN (${placeholders})
-      `)
+			const results = await this.sql<MemberRotation[]>`
+				SELECT * FROM member_rotation 
+				WHERE is_eligible = true AND user_id != ALL(${excludeIds})
+			`
 
-			return stmt.all(...excludeIds) as MemberRotation[]
+			return results
 		} catch (error) {
 			console.error('❌ Failed to get eligible members excluding recent:', error)
 			return []
 		}
 	}
 
-	// Nomination methods
-	addNomination(userId: string, username: string, targetMonth: string): GameNomination {
+	async addNomination(userId: string, username: string, targetMonth: string): Promise<GameNomination> {
 		try {
-			// Deactivate any existing nominations for this month
-			this.db
-				.prepare(
-					`
-        UPDATE game_nominations 
-        SET is_active = 0 
-        WHERE target_month = ?
-      `,
-				)
-				.run(targetMonth)
+			await this.sql`
+				UPDATE game_nominations 
+				SET is_active = false 
+				WHERE target_month = ${targetMonth}
+			`
 
-			const stmt = this.db.prepare(`
-        INSERT INTO game_nominations (nominated_user_id, nominated_username, target_month)
-        VALUES (?, ?, ?)
-      `)
+			const [result] = await this.sql`
+				INSERT INTO game_nominations (nominated_user_id, nominated_username, target_month)
+				VALUES (${userId}, ${username}, ${targetMonth})
+				RETURNING *
+			`
 
-			const result = stmt.run(userId, username, targetMonth)
-			return this.getNominationById(result.lastInsertRowid as number)!
+			return result as GameNomination
 		} catch (error) {
 			console.error('❌ Failed to add nomination:', error)
 			throw error
 		}
 	}
 
-	getNominationById(id: number): GameNomination | null {
+	async getNominationById(id: number): Promise<GameNomination | null> {
 		try {
-			const stmt = this.db.prepare('SELECT * FROM game_nominations WHERE id = ?')
-			return stmt.get(id) as GameNomination | null
+			const [result] = await this.sql`SELECT * FROM game_nominations WHERE id = ${id}`
+			return (result as GameNomination) || null
 		} catch (error) {
 			console.error('❌ Failed to get nomination by ID:', error)
 			return null
 		}
 	}
 
-	getActiveNominationForMonth(month: string): GameNomination | null {
+	async getActiveNominationForMonth(month: string): Promise<GameNomination | null> {
 		try {
-			const stmt = this.db.prepare(`
-        SELECT * FROM game_nominations 
-        WHERE target_month = ? AND is_active = 1
-      `)
-			return stmt.get(month) as GameNomination | null
+			const [result] = await this.sql`
+				SELECT * FROM game_nominations 
+				WHERE target_month = ${month} AND is_active = true
+			`
+			return (result as GameNomination) || null
 		} catch (error) {
 			console.error('❌ Failed to get active nomination for month:', error)
 			return null
 		}
 	}
 
-	deactivateNomination(id: number): void {
+	async deactivateNomination(id: number): Promise<void> {
 		try {
-			const stmt = this.db.prepare('UPDATE game_nominations SET is_active = 0 WHERE id = ?')
-			stmt.run(id)
+			await this.sql`UPDATE game_nominations SET is_active = false WHERE id = ${id}`
 		} catch (error) {
 			console.error('❌ Failed to deactivate nomination:', error)
 			throw error
 		}
 	}
 
-	close(): void {
+	async close(): Promise<void> {
 		try {
-			this.db.close()
+			await this.sql.end()
 			console.log('📦 Database connection closed')
 		} catch (error) {
 			console.error('❌ Failed to close database:', error)

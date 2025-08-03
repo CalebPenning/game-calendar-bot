@@ -5,7 +5,7 @@ export const data = new SlashCommandBuilder().setName('current-game').setDescrip
 
 export async function execute(interaction: ChatInputCommandInteraction, db: GameClubDatabase) {
 	try {
-		const currentGame = db.getCurrentMonthGame()
+		const currentGame = await db.getCurrentMonthGame()
 
 		if (!currentGame) {
 			const embed = new EmbedBuilder()
@@ -26,13 +26,19 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 		const embed = new EmbedBuilder()
 			.setColor(0x4ecdc4)
 			.setTitle(`🎮 ${currentMonth}'s Game`)
-			.setDescription(`**${currentGame.game_name}**`)
+			.setDescription(
+				`**${currentGame.game_name}**${currentGame.game_description ? `\n\n${currentGame.game_description}` : ''}`,
+			)
 			.addFields(
 				{ name: 'Picked by', value: `<@${currentGame.picker_id}>`, inline: true },
 				{ name: 'Selected on', value: new Date(currentGame.selected_at).toLocaleDateString(), inline: true },
 			)
 			.setTimestamp()
 			.setFooter({ text: 'Happy gaming! 🎮' })
+
+		if (currentGame.game_image_url) {
+			embed.setThumbnail(currentGame.game_image_url)
+		}
 
 		await interaction.reply({ embeds: [embed] })
 	} catch (error) {

@@ -16,7 +16,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction, db: GameClubDatabase) {
 	try {
 		const limit = interaction.options.getInteger('limit') || 10
-		const allGames = db.getAllGames()
+		const allGames = await db.getAllGames()
 		const games = allGames.slice(0, limit)
 
 		if (games.length === 0) {
