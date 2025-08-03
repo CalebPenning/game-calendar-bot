@@ -3,14 +3,12 @@ import { config } from 'dotenv'
 import fs from 'fs'
 import path from 'path'
 
-// Load environment variables
 config()
 
 const commands: CommandInteraction[] = []
 const commandsPath = path.join(__dirname, 'commands')
 const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'))
 
-// Load all commands
 for (const file of commandFiles) {
 	const filePath = path.join(commandsPath, file)
 	const command = require(filePath)
@@ -22,10 +20,8 @@ for (const file of commandFiles) {
 	}
 }
 
-// Create REST instance
 const rest = new REST().setToken(process.env.DISCORD_TOKEN!)
 
-// Deploy commands
 async function deployCommands() {
 	try {
 		console.log(`🚀 Started refreshing ${commands.length} application (/) commands.`)
@@ -51,7 +47,6 @@ async function deployCommands() {
 	}
 }
 
-// Check required environment variables
 if (!process.env.DISCORD_TOKEN) {
 	console.error('❌ DISCORD_TOKEN is not set in environment variables!')
 	process.exit(1)

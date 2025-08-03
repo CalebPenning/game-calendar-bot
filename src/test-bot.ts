@@ -3,7 +3,6 @@ import * as cron from 'node-cron'
 import path from 'path'
 import fs from 'fs'
 
-// Test bot initialization without Discord connection
 console.log('🧪 Testing Discord Game Club Bot initialization...\n')
 
 try {
@@ -20,7 +19,6 @@ try {
 		const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js') || file.endsWith('.ts'))
 		console.log(`✅ Found ${commandFiles.length} command files`)
 
-		// Try to load each command
 		for (const file of commandFiles) {
 			try {
 				const filePath = path.join(commandsPath, file)
@@ -39,7 +37,6 @@ try {
 
 	console.log('\n3️⃣ Testing cron schedule validation...')
 
-	// Test cron expressions without actually running them
 	const cronExpressions = [
 		{ name: 'Monthly notifications', expr: '0 9 1 * *' },
 		{ name: 'Weekly reminders', expr: '0 10 * * 0' },
@@ -48,15 +45,12 @@ try {
 
 	cronExpressions.forEach(({ name, expr }) => {
 		try {
-			// Validate cron expression
 			cron.validate(expr)
 			console.log(`✅ ${name}: ${expr} - Valid`)
 		} catch (error) {
 			console.log(`❌ ${name}: ${expr} - Invalid`)
 		}
 	})
-
-	// No database connection to close
 
 	console.log('\n🎉 Bot initialization test passed! Ready for Discord setup.')
 	console.log('\n📋 Next steps:')
