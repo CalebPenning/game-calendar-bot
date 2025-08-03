@@ -16,10 +16,6 @@ export function getEligibleMembersForAutoNomination(
 	return Array.from(members.values()).filter((member) => !member.user.bot && !excludedUserIds.includes(member.user.id))
 }
 
-/**
- * Select a random member from an array using cryptographically secure randomness
- * Uses Node.js crypto.randomInt() to ensure fairness and prevent gaming
- */
 export function selectRandomMember(members: GuildMember[]): GuildMember | null {
 	if (members.length === 0) return null
 	const randomIndex = randomInt(0, members.length)
