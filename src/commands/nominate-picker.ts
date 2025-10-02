@@ -46,7 +46,8 @@ export async function execute(interaction: ChatInputCommandInteraction, db: Game
 			return
 		}
 
-		const eligibleMembers = await db.getCurrentlyEligibleMembers()
+		const guildMembers = await interaction.guild?.members.fetch()
+		const eligibleMembers = await db.getCurrentlyEligibleMembers(guildMembers)
 		const isEligible = eligibleMembers.some((member) => member.user_id === targetUser.id)
 
 		if (!isEligible && eligibleMembers.length > 0) {
