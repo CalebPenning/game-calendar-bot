@@ -11,7 +11,7 @@ export function getEligibleMembersForAutoNomination(
 	members: Map<string, GuildMember>,
 	recentPickerIds: string[],
 ): GuildMember[] {
-	const excludedUserIds = [CONFIG.AUTO_NOMINATION.EXCLUDED_USER_ID, ...recentPickerIds]
+	const excludedUserIds = [...CONFIG.AUTO_NOMINATION.EXCLUDED_USER_IDS, ...recentPickerIds]
 
 	return Array.from(members.values()).filter((member) => !member.user.bot && !excludedUserIds.includes(member.user.id))
 }

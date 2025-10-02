@@ -1,6 +1,8 @@
 import postgres from 'postgres'
 import { GameEntry, MemberRotation, GameNomination } from './types'
-import { ENVIRONMENT } from './config'
+import { ENVIRONMENT, CONFIG } from './config'
+import { GuildMember } from 'discord.js'
+import { getDisplayName } from './utils/discord'
 
 export class GameClubDatabase {
 	private sql: postgres.Sql
@@ -180,24 +182,35 @@ export class GameClubDatabase {
 		}
 	}
 
-	async getCurrentlyEligibleMembers(): Promise<MemberRotation[]> {
+	async getCurrentlyEligibleMembers(guildMembers?: Map<string, GuildMember>): Promise<MemberRotation[]> {
 		try {
+			// Get recent pickers to exclude
 			const recentPickers = await this.sql<Partial<GameEntry>[]>`
-				SELECT picker_id FROM games
+				SELECT picker_id, picker_name FROM games
 				ORDER BY month DESC
 				LIMIT 2
 			`
+			const excludeIds = [...CONFIG.AUTO_NOMINATION.EXCLUDED_USER_IDS, ...recentPickers.map((p) => p.picker_id).filter((id): id is string => !!id)]
+			console.log('IDs to exclude:', excludeIds)
 
-			const excludeIds = recentPickers.map((p) => p.picker_id).filter((id): id is string => !!id)
-
-			if (excludeIds.length === 0) {
-				return this.getEligibleMembers()
+			// If guild members were provided, ensure they're all in the rotation
+			if (guildMembers) {
+				for (const [id, member] of guildMembers) {
+					if (!member.user.bot) {
+						await this.addMember(id, getDisplayName(member)).catch(err => 
+							console.error(`Failed to add member ${id} to rotation:`, err)
+						)
+					}
+				}
 			}
 
+			// Get all eligible members excluding recent pickers and permanently excluded users
 			const results = await this.sql<MemberRotation[]>`
 				SELECT * FROM member_rotation 
-				WHERE is_eligible = true AND user_id NOT IN ${this.sql(excludeIds)}
+				WHERE is_eligible = true 
+				AND user_id NOT IN ${this.sql(excludeIds)}
 			`
+			console.log('Currently eligible members:', results.map(m => `${m.username} (${m.user_id})`))
 
 			return results
 		} catch (error) {
